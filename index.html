@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI旅行规划助手</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <!-- 头部 -->
+        <header class="header">
+            <div class="header-content">
+                <h1><i class="fas fa-map-marked-alt"></i> AI旅行规划助手</h1>
+                <p>让AI为您定制专属旅行攻略</p>
+            </div>
+        </header>
+
+        <!-- 第一步：用户信息收集表单 -->
+        <section id="step1" class="step-section active">
+            <div class="form-container">
+                <h2><i class="fas fa-user-edit"></i> 告诉我们您的旅行需求</h2>
+                <form id="travel-form">
+                    <div class="form-group">
+                        <label for="departure">
+                            <i class="fas fa-map-marker-alt"></i> 出发地
+                        </label>
+                        <input type="text" id="departure" name="departure" placeholder="请输入您的出发地" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="destination">
+                            <i class="fas fa-flag"></i> 目的地
+                        </label>
+                        <input type="text" id="destination" name="destination" placeholder="请输入您的目的地" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="dates">
+                            <i class="fas fa-calendar-alt"></i> 预计旅游日期
+                        </label>
+                        <div class="date-inputs">
+                            <input type="date" id="startDate" name="startDate" required>
+                            <span>至</span>
+                            <input type="date" id="endDate" name="endDate" required>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="travelers">
+                            <i class="fas fa-users"></i> 预计出行人数
+                        </label>
+                        <div class="travelers-input">
+                            <div class="traveler-option">
+                                <label>成人</label>
+                                <div class="number-input">
+                                    <button type="button" class="minus" data-target="adults">-</button>
+                                    <span class="count" id="adults">2</span>
+                                    <button type="button" class="plus" data-target="adults">+</button>
+                                </div>
+                            </div>
+                            <div class="traveler-option">
+                                <label>儿童</label>
+                                <div class="number-input">
+                                    <button type="button" class="minus" data-target="children">-</button>
+                                    <span class="count" id="children">0</span>
+                                    <button type="button" class="plus" data-target="children">+</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="budget">
+                            <i class="fas fa-yen-sign"></i> 预算范围
+                        </label>
+                        <div class="budget-options">
+                            <label class="budget-option">
+                                <input type="radio" name="budget" value="500" required>
+                                <span>¥500以下</span>
+                            </label>
+                            <label class="budget-option">
+                                <input type="radio" name="budget" value="1000" required>
+                                <span>¥500-1000</span>
+                            </label>
+                            <label class="budget-option">
+                                <input type="radio" name="budget" value="5000" required>
+                                <span>¥1000-5000</span>
+                            </label>
+                            <label class="budget-option">
+                                <input type="radio" name="budget" value="10000" required>
+                                <span>¥5000-10000</span>
+                            </label>
+                            <label class="budget-option">
+                                <input type="radio" name="budget" value="unlimited" required>
+                                <span>¥10000以上</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="preferences">
+                            <i class="fas fa-heart"></i> 其他个性化诉求
+                        </label>
+                        <textarea id="preferences" name="preferences" placeholder="请告诉我们您的特殊需求，比如：想要带孩子从杭州出发去北京，推荐一些适合孩子的景点和美食，预算充足，推荐一份舒适完整的攻略，结果用中文网页形式呈现，要求必须包含故宫、国家博物馆等景点" rows="4"></textarea>
+                    </div>
+
+                    <button type="submit" class="submit-btn">
+                        <i class="fas fa-magic"></i> 开始规划我的旅程
+                    </button>
+                </form>
+            </div>
+        </section>
+
+        <!-- 第二步：AI规划过程展示 -->
+        <section id="step2" class="step-section">
+            <div class="process-container">
+                <h2><i class="fas fa-brain"></i> AI正在为您规划旅程</h2>
+                <div class="process-steps">
+                    <div class="process-step" id="step-analyze">
+                        <div class="step-icon">
+                            <i class="fas fa-search"></i>
+                        </div>
+                        <div class="step-content">
+                            <h3>分析您的需求</h3>
+                            <p>正在分析您的出行偏好和需求...</p>
+                        </div>
+                        <div class="step-status">
+                            <i class="fas fa-spinner fa-spin"></i>
+                        </div>
+                    </div>
+
+                    <div class="process-step" id="step-transport">
+                        <div class="step-icon">
+                            <i class="fas fa-train"></i>
+                        </div>
+                        <div class="step-content">
+                            <h3>查询交通信息</h3>
+                            <p>正在查询最优交通方案...</p>
+                        </div>
+                        <div class="step-status">
+                            <i class="fas fa-clock"></i>
+                        </div>
+                    </div>
+
+                    <div class="process-step" id="step-weather">
+                        <div class="step-icon">
+                            <i class="fas fa-cloud-sun"></i>
+                        </div>
+                        <div class="step-content">
+                            <h3>查询天气信息</h3>
+                            <p>正在获取目的地天气预报...</p>
+                        </div>
+                        <div class="step-status">
+                            <i class="fas fa-clock"></i>
+                        </div>
+                    </div>
+
+                    <div class="process-step" id="step-attractions">
+                        <div class="step-icon">
+                            <i class="fas fa-camera"></i>
+                        </div>
+                        <div class="step-content">
+                            <h3>搜索热门景点</h3>
+                            <p>正在小红书搜索推荐景点和美食...</p>
+                        </div>
+                        <div class="step-status">
+                            <i class="fas fa-clock"></i>
+                        </div>
+                    </div>
+
+                    <div class="process-step" id="step-plan">
+                        <div class="step-icon">
+                            <i class="fas fa-route"></i>
+                        </div>
+                        <div class="step-content">
+                            <h3>制定旅行计划</h3>
+                            <p>正在为您制定个性化旅行攻略...</p>
+                        </div>
+                        <div class="step-status">
+                            <i class="fas fa-clock"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 第三步：旅行攻略展示 -->
+        <section id="step3" class="step-section">
+            <div class="travel-guide-container">
+                <div class="guide-header">
+                    <button id="back-to-form" class="back-btn">
+                        <i class="fas fa-arrow-left"></i> 重新规划
+                    </button>
+                    <button id="download-guide" class="download-btn">
+                        <i class="fas fa-download"></i> 下载攻略
+                    </button>
+                </div>
+                <div id="travel-guide" class="travel-guide">
+                    <!-- 攻略内容将在这里动态生成 -->
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html> 

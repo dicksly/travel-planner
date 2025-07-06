@@ -1,0 +1,601 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'PingFang SC', 'Microsoft YaHei', Arial, sans-serif;
+    line-height: 1.6;
+    color: #333;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 20px;
+}
+
+/* Header */
+.header {
+    text-align: center;
+    padding: 40px 0;
+    color: white;
+}
+
+.header-content h1 {
+    font-size: 2.5rem;
+    margin-bottom: 10px;
+    font-weight: 700;
+}
+
+.header-content p {
+    font-size: 1.2rem;
+    opacity: 0.9;
+}
+
+/* Step Sections */
+.step-section {
+    display: none;
+    animation: fadeIn 0.5s ease-in-out;
+}
+
+.step-section.active {
+    display: block;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Form Container */
+.form-container {
+    background: white;
+    border-radius: 20px;
+    padding: 40px;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+    margin-bottom: 40px;
+}
+
+.form-container h2 {
+    color: #4a5568;
+    margin-bottom: 30px;
+    font-size: 1.8rem;
+    text-align: center;
+}
+
+.form-container h2 i {
+    color: #667eea;
+    margin-right: 10px;
+}
+
+/* Form Groups */
+.form-group {
+    margin-bottom: 25px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 600;
+    color: #4a5568;
+    font-size: 1rem;
+}
+
+.form-group label i {
+    color: #667eea;
+    margin-right: 8px;
+    width: 20px;
+}
+
+.form-group input[type="text"],
+.form-group input[type="date"],
+.form-group textarea {
+    width: 100%;
+    padding: 12px 16px;
+    border: 2px solid #e2e8f0;
+    border-radius: 10px;
+    font-size: 1rem;
+    transition: all 0.3s ease;
+}
+
+.form-group input:focus,
+.form-group textarea:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.form-group textarea {
+    min-height: 100px;
+    resize: vertical;
+}
+
+/* Date Inputs */
+.date-inputs {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.date-inputs input {
+    flex: 1;
+}
+
+.date-inputs span {
+    font-weight: 500;
+    color: #718096;
+}
+
+/* Travelers Input */
+.travelers-input {
+    display: flex;
+    gap: 30px;
+}
+
+.traveler-option {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.traveler-option label {
+    margin-bottom: 0;
+    font-weight: 500;
+    color: #4a5568;
+}
+
+.number-input {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.number-input button {
+    width: 35px;
+    height: 35px;
+    border: 2px solid #e2e8f0;
+    background: white;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 1.2rem;
+    font-weight: bold;
+    color: #667eea;
+    transition: all 0.3s ease;
+}
+
+.number-input button:hover {
+    background: #667eea;
+    color: white;
+    border-color: #667eea;
+}
+
+.number-input .count {
+    min-width: 30px;
+    text-align: center;
+    font-weight: 600;
+    font-size: 1.1rem;
+}
+
+/* Budget Options */
+.budget-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+}
+
+.budget-option {
+    flex: 1;
+    min-width: 150px;
+    margin-bottom: 0;
+    cursor: pointer;
+}
+
+.budget-option input[type="radio"] {
+    display: none;
+}
+
+.budget-option span {
+    display: block;
+    padding: 12px 20px;
+    border: 2px solid #e2e8f0;
+    border-radius: 10px;
+    text-align: center;
+    transition: all 0.3s ease;
+    font-weight: 500;
+}
+
+.budget-option:hover span {
+    border-color: #667eea;
+    background: #f7fafc;
+}
+
+.budget-option input[type="radio"]:checked + span {
+    background: #667eea;
+    color: white;
+    border-color: #667eea;
+}
+
+/* Submit Button */
+.submit-btn {
+    width: 100%;
+    padding: 15px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-size: 1.1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    margin-top: 20px;
+}
+
+.submit-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+}
+
+.submit-btn i {
+    margin-right: 8px;
+}
+
+/* Process Container */
+.process-container {
+    background: white;
+    border-radius: 20px;
+    padding: 40px;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+    margin-bottom: 40px;
+}
+
+.process-container h2 {
+    color: #4a5568;
+    margin-bottom: 30px;
+    font-size: 1.8rem;
+    text-align: center;
+}
+
+.process-container h2 i {
+    color: #667eea;
+    margin-right: 10px;
+}
+
+.process-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.process-step {
+    display: flex;
+    align-items: center;
+    padding: 20px;
+    border-radius: 15px;
+    background: #f7fafc;
+    border: 2px solid #e2e8f0;
+    transition: all 0.3s ease;
+}
+
+.process-step.active {
+    background: #ebf8ff;
+    border-color: #667eea;
+}
+
+.process-step.completed {
+    background: #f0fff4;
+    border-color: #48bb78;
+}
+
+.step-icon {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: #e2e8f0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 20px;
+    font-size: 1.5rem;
+    color: #718096;
+    transition: all 0.3s ease;
+}
+
+.process-step.active .step-icon {
+    background: #667eea;
+    color: white;
+}
+
+.process-step.completed .step-icon {
+    background: #48bb78;
+    color: white;
+}
+
+.step-content {
+    flex: 1;
+}
+
+.step-content h3 {
+    color: #4a5568;
+    margin-bottom: 5px;
+    font-size: 1.2rem;
+}
+
+.step-content p {
+    color: #718096;
+    font-size: 0.9rem;
+}
+
+.step-status {
+    font-size: 1.5rem;
+    color: #718096;
+}
+
+.process-step.active .step-status {
+    color: #667eea;
+}
+
+.process-step.completed .step-status {
+    color: #48bb78;
+}
+
+/* Travel Guide Container */
+.travel-guide-container {
+    background: white;
+    border-radius: 20px;
+    padding: 40px;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+    margin-bottom: 40px;
+}
+
+.guide-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 30px;
+    padding-bottom: 20px;
+    border-bottom: 2px solid #e2e8f0;
+}
+
+.back-btn, .download-btn {
+    padding: 10px 20px;
+    border: 2px solid #667eea;
+    border-radius: 10px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.back-btn {
+    background: white;
+    color: #667eea;
+}
+
+.back-btn:hover {
+    background: #667eea;
+    color: white;
+}
+
+.download-btn {
+    background: #667eea;
+    color: white;
+}
+
+.download-btn:hover {
+    background: #5a6fd8;
+}
+
+/* Travel Guide Content */
+.travel-guide {
+    line-height: 1.8;
+}
+
+.travel-guide h1 {
+    color: #2d3748;
+    font-size: 2rem;
+    margin-bottom: 20px;
+    text-align: center;
+    padding: 20px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 15px;
+}
+
+.travel-guide h2 {
+    color: #4a5568;
+    font-size: 1.5rem;
+    margin: 30px 0 15px 0;
+    padding: 10px 0;
+    border-bottom: 2px solid #e2e8f0;
+}
+
+.travel-guide h3 {
+    color: #2d3748;
+    font-size: 1.3rem;
+    margin: 25px 0 10px 0;
+}
+
+.travel-guide h4 {
+    color: #4a5568;
+    font-size: 1.1rem;
+    margin: 20px 0 10px 0;
+}
+
+.travel-guide p {
+    margin-bottom: 15px;
+    color: #4a5568;
+}
+
+.travel-guide ul {
+    margin: 15px 0;
+    padding-left: 20px;
+}
+
+.travel-guide li {
+    margin-bottom: 8px;
+    color: #4a5568;
+}
+
+.travel-guide table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 20px 0;
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+}
+
+.travel-guide th {
+    background: #667eea;
+    color: white;
+    padding: 15px;
+    text-align: left;
+    font-weight: 600;
+}
+
+.travel-guide td {
+    padding: 12px 15px;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.travel-guide tr:nth-child(even) {
+    background: #f7fafc;
+}
+
+.travel-guide tr:hover {
+    background: #ebf8ff;
+}
+
+.travel-guide .budget-total {
+    background: #f0fff4;
+    font-weight: bold;
+    color: #2d3748;
+}
+
+.travel-guide .warning {
+    background: #fff5f5;
+    border: 1px solid #fed7d7;
+    border-radius: 10px;
+    padding: 20px;
+    margin: 20px 0;
+}
+
+.travel-guide .warning h4 {
+    color: #e53e3e;
+    margin-bottom: 10px;
+}
+
+.travel-guide .highlight {
+    background: #ebf8ff;
+    border-left: 4px solid #667eea;
+    padding: 15px;
+    margin: 15px 0;
+    border-radius: 0 10px 10px 0;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .container {
+        padding: 0 15px;
+    }
+    
+    .header-content h1 {
+        font-size: 2rem;
+    }
+    
+    .form-container, .process-container, .travel-guide-container {
+        padding: 30px 20px;
+    }
+    
+    .date-inputs {
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    .travelers-input {
+        flex-direction: column;
+        gap: 15px;
+    }
+    
+    .budget-options {
+        flex-direction: column;
+    }
+    
+    .budget-option {
+        min-width: auto;
+    }
+    
+    .process-step {
+        flex-direction: column;
+        text-align: center;
+    }
+    
+    .step-icon {
+        margin-right: 0;
+        margin-bottom: 15px;
+    }
+    
+    .guide-header {
+        flex-direction: column;
+        gap: 15px;
+    }
+    
+    .travel-guide h1 {
+        font-size: 1.5rem;
+    }
+    
+    .travel-guide table {
+        font-size: 0.9rem;
+    }
+}
+
+/* Loading Animation */
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.fa-spinner {
+    animation: spin 1s linear infinite;
+}
+
+/* Emoji and Icon Styling */
+.travel-guide .emoji {
+    font-size: 1.2em;
+    margin-right: 5px;
+}
+
+.travel-guide .price {
+    color: #e53e3e;
+    font-weight: bold;
+}
+
+.travel-guide .time {
+    color: #667eea;
+    font-weight: 600;
+}
+
+.travel-guide .location {
+    color: #48bb78;
+    font-weight: 600;
+}
+
+/* Print Styles */
+@media print {
+    body {
+        background: white;
+    }
+    
+    .guide-header {
+        display: none;
+    }
+    
+    .travel-guide-container {
+        box-shadow: none;
+        padding: 20px;
+    }
+}
