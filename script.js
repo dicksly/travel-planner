@@ -414,7 +414,7 @@ async function handleStreamEvent(data) {
                 handleFunctionCall(content);
                 break;
                 
-            case 'tool_output':
+            case 'tool_response':
                 // 工具输出 - 更新对应步骤完成状态
                 handleToolOutput(content);
                 break;
