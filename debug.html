@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI旅行规划助手 - 调试模式</title>
+    <style>
+        body {
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+            margin: 40px;
+            background: #f5f5f5;
+        }
+        .debug-container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .status-card {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .status-good { border-left: 4px solid #28a745; }
+        .status-warning { border-left: 4px solid #ffc107; }
+        .status-error { border-left: 4px solid #dc3545; }
+        .test-btn {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 10px;
+        }
+        .test-btn:hover {
+            background: #0056b3;
+        }
+        .log-output {
+            background: #1a1a1a;
+            color: #00ff00;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: monospace;
+            height: 200px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+        .quick-form {
+            background: #e3f2fd;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .form-row {
+            margin: 10px 0;
+        }
+        .form-row label {
+            display: inline-block;
+            width: 120px;
+            font-weight: bold;
+        }
+        .form-row input, .form-row select {
+            width: 200px;
+            padding: 5px;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body>
+    <div class="debug-container">
+        <h1>🔧 AI旅行规划助手 - 调试模式</h1>
+        
+        <div class="status-card status-good">
+            <h3>✅ 系统状态检查</h3>
+            <p>配置文件加载: <span id="config-status">检查中...</span></p>
+            <p>当前模式: <span id="ai-mode">检查中...</span></p>
+            <p>调试日志: <span id="debug-status">检查中...</span></p>
+        </div>
+
+        <div class="quick-form">
+            <h3>🚀 快速测试表单</h3>
+            <div class="form-row">
+                <label>出发地:</label>
+                <input type="text" id="quick-departure" value="北京" />
+            </div>
+            <div class="form-row">
+                <label>目的地:</label>
+                <input type="text" id="quick-destination" value="上海" />
+            </div>
+            <div class="form-row">
+                <label>天数:</label>
+                <input type="number" id="quick-days" value="3" min="1" max="30" />
+            </div>
+            <div class="form-row">
+                <label>人数:</label>
+                <input type="number" id="quick-people" value="2" min="1" max="10" />
+            </div>
+            <div class="form-row">
+                <label>预算:</label>
+                <select id="quick-budget">
+                    <option value="1000">¥500-1000</option>
+                    <option value="5000" selected>¥1000-5000</option>
+                    <option value="10000">¥5000-10000</option>
+                    <option value="unlimited">¥10000以上</option>
+                </select>
+            </div>
+            <button class="test-btn" onclick="runQuickTest()">🎯 快速测试</button>
+            <button class="test-btn" onclick="clearLog()">🗑️ 清空日志</button>
+        </div>
+
+        <div class="status-card">
+            <h3>📊 实时日志</h3>
+            <div id="log-output" class="log-output">等待测试...</div>
+        </div>
+
+        <div class="status-card">
+            <h3>🔗 操作按钮</h3>
+            <button class="test-btn" onclick="openMainApp()">🏠 打开主应用</button>
+            <button class="test-btn" onclick="toggleAIMode()">🤖 切换AI模式</button>
+            <button class="test-btn" onclick="testConfig()">⚙️ 测试配置</button>
+        </div>
+    </div>
+
+    <script src="config.js"></script>
+    <script>
+        // 初始化状态检查
+        function initStatusCheck() {
+            // 检查配置文件
+            if (typeof CONFIG !== 'undefined') {
+                document.getElementById('config-status').textContent = '正常加载';
+                document.getElementById('ai-mode').textContent = CONFIG.APP.enableRealAI ? '真实AI模式' : '演示模式';
+                document.getElementById('debug-status').textContent = CONFIG.DEBUG.enableLogging ? '已启用' : '已禁用';
+            } else {
+                document.getElementById('config-status').textContent = '加载失败';
+                document.getElementById('ai-mode').textContent = '无法确定';
+                document.getElementById('debug-status').textContent = '无法确定';
+            }
+        }
+
+        // 日志输出
+        function log(message) {
+            const logOutput = document.getElementById('log-output');
+            const timestamp = new Date().toLocaleTimeString();
+            logOutput.textContent += `[${timestamp}] ${message}\n`;
+            logOutput.scrollTop = logOutput.scrollHeight;
+        }
+
+        // 清空日志
+        function clearLog() {
+            document.getElementById('log-output').textContent = '';
+        }
+
+        // 快速测试
+        function runQuickTest() {
+            const departure = document.getElementById('quick-departure').value;
+            const destination = document.getElementById('quick-destination').value;
+            const days = document.getElementById('quick-days').value;
+            const people = document.getElementById('quick-people').value;
+            const budget = document.getElementById('quick-budget').value;
+
+            log(`🚀 开始快速测试`);
+            log(`出发地: ${departure}`);
+            log(`目的地: ${destination}`);
+            log(`天数: ${days} 天`);
+            log(`人数: ${people} 人`);
+            log(`预算: ${budget}`);
+            log(`AI模式: ${CONFIG.APP.enableRealAI ? '真实AI' : '演示模式'}`);
+            
+            // 模拟处理过程
+            setTimeout(() => {
+                log(`✅ 表单验证通过`);
+                log(`🔄 开始AI处理流程...`);
+                
+                if (CONFIG.APP.enableRealAI) {
+                    log(`🤖 调用真实AI API`);
+                    log(`⚠️ 注意: 需要有效的API密钥`);
+                } else {
+                    log(`🎭 使用演示模式`);
+                    log(`✨ 模拟AI处理完成`);
+                }
+                
+                setTimeout(() => {
+                    log(`🎉 测试完成！`);
+                    log(`💡 建议: 在主应用中查看完整效果`);
+                }, 1000);
+            }, 500);
+        }
+
+        // 打开主应用
+        function openMainApp() {
+            window.open('index.html', '_blank');
+        }
+
+        // 切换AI模式
+        function toggleAIMode() {
+            const currentMode = CONFIG.APP.enableRealAI;
+            const newMode = !currentMode;
+            
+            log(`🔄 切换AI模式: ${currentMode ? '真实AI' : '演示'} → ${newMode ? '真实AI' : '演示'}`);
+            log(`⚠️ 注意: 需要手动修改 config.js 文件中的 enableRealAI 设置`);
+            log(`📝 配置文件路径: config.js`);
+            log(`🔧 修改: enableRealAI: ${newMode}`);
+        }
+
+        // 测试配置
+        function testConfig() {
+            log(`🔧 配置测试开始`);
+            log(`API端点: ${CONFIG.COZE_API.endpoint}`);
+            log(`Bot ID: ${CONFIG.COZE_API.bot_id}`);
+            log(`Token: ${CONFIG.COZE_API.token.substring(0, 10)}...`);
+            log(`启用真实AI: ${CONFIG.APP.enableRealAI}`);
+            log(`打字机速度: ${CONFIG.APP.typewriterSpeed}ms`);
+            log(`调试日志: ${CONFIG.DEBUG.enableLogging}`);
+            log(`✅ 配置测试完成`);
+        }
+
+        // 页面加载时初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            initStatusCheck();
+            log('🎯 调试模式已启动');
+            log('💡 使用快速测试验证功能');
+        });
+    </script>
+</body>
+</html> 

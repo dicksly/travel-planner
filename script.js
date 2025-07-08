@@ -4,6 +4,10 @@ let formData = {};
 let processSteps = ['analyze', 'transport', 'weather', 'attractions', 'plan'];
 let currentProcessStep = 0;
 
+// AI处理相关变量
+let isReceivingAnswer = false;
+let currentAnswerId = null;
+
 // DOM元素
 const form = document.getElementById('travel-form');
 const steps = document.querySelectorAll('.step-section');
@@ -115,14 +119,444 @@ function showStep(step) {
 // 开始AI处理过程
 function startAIProcess() {
     currentProcessStep = 0;
+    // 重置所有步骤状态
+    resetAllSteps();
+    // 调用真实大模型API
+    callCozeAPI();
+}
+
+// 重置所有步骤状态
+function resetAllSteps() {
+    processSteps.forEach(stepId => {
+        const stepElement = document.getElementById(`step-${stepId}`);
+        stepElement.classList.remove('active', 'completed');
+        stepElement.querySelector('.step-status').innerHTML = '<i class="fas fa-clock"></i>';
+        // 重置步骤描述
+        const messages = {
+            analyze: '正在分析您的出行偏好和需求...',
+            transport: '正在查询最优交通方案...',
+            weather: '正在获取目的地天气预报...',
+            attractions: '正在小红书搜索推荐景点和美食...',
+            plan: '正在为您制定个性化旅行攻略...'
+        };
+        stepElement.querySelector('.step-content p').textContent = messages[stepId];
+    });
+}
+
+// 调用Coze API
+async function callCozeAPI() {
+    try {
+        // 生成自然语言prompt
+        const prompt = generatePrompt();
+        
+        console.log('🤖 开始AI处理流程...');
+        console.log('📝 生成的prompt:', prompt);
+        
+        // 检查是否启用真实AI功能
+        if (!CONFIG.APP.enableRealAI) {
+            console.log('⚠️ 真实AI功能已禁用，使用演示模式');
+            throw new Error('AI功能已禁用，使用模拟模式');
+        }
+        
+        console.log('🔗 准备调用Coze API...');
+
+        // 准备API请求
+        const userId = generateUserId();
+        const requestBody = {
+            bot_id: CONFIG.COZE_API.bot_id,
+            user_id: userId,
+            stream: true,
+            additional_messages: [
+                {
+                    content: prompt,
+                    content_type: "text",
+                    role: "user",
+                    type: "question"
+                }
+            ],
+            parameters: {}
+        };
+
+        console.log('📋 请求参数:', {
+            endpoint: CONFIG.COZE_API.endpoint,
+            bot_id: CONFIG.COZE_API.bot_id,
+            user_id: userId,
+            token_preview: CONFIG.COZE_API.token.substring(0, 20) + '...',
+            prompt_length: prompt.length
+        });
+
+        // 添加请求超时处理
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => {
+            controller.abort();
+            console.error('⏰ API请求超时');
+        }, 30000); // 30秒超时
+
+        let response;
+        try {
+            console.log('🚀 发起API请求...');
+            
+            // 发起流式请求
+            response = await fetch(CONFIG.COZE_API.endpoint, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${CONFIG.COZE_API.token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(requestBody),
+                signal: controller.signal
+            });
+
+            clearTimeout(timeoutId);
+            
+            console.log('📡 收到响应:', {
+                status: response.status,
+                statusText: response.statusText,
+                headers: Object.fromEntries(response.headers.entries())
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('❌ API响应错误:', errorText);
+                throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+            }
+
+            // 处理流式响应
+            console.log('📊 开始处理流式响应...');
+            await handleStreamResponse(response);
+            
+        } catch (fetchError) {
+            clearTimeout(timeoutId);
+            throw fetchError;
+        }
+
+    } catch (error) {
+        console.error('❌ 调用Coze API失败:', error);
+        console.log('🔄 正在回退到演示模式...');
+        
+        // 显示错误并回退到模拟模式
+        showError('AI服务暂时不可用，正在使用演示模式...');
+        setTimeout(() => {
+            console.log('📱 启动模拟AI处理流程...');
+            fallbackToMockProcess();
+        }, 2000);
+    }
+}
+
+// 生成自然语言prompt
+function generatePrompt() {
+    const totalPeople = formData.adults + formData.children;
+    const budgetText = getBudgetText(formData.budget);
+    
+    let prompt = `我准备从${formData.departure}出发去${formData.destination}旅游 ${formData.days} 天，`;
+    prompt += `${formData.adults}个成人`;
+    if (formData.children > 0) {
+        prompt += `，${formData.children}个儿童`;
+    }
+    prompt += `，预算${budgetText}。`;
+    
+    if (formData.preferences) {
+        prompt += `特殊需求：${formData.preferences}。`;
+    }
+    
+    prompt += `请为我制定一份详细的旅行攻略，包含交通建议、住宿推荐、每日行程安排、预算明细等，`;
+    prompt += `结果请用中文markdown格式呈现，要求格式美观、内容详实。`;
+    
+    return prompt;
+}
+
+// 生成用户ID
+function generateUserId() {
+    return Date.now().toString() + Math.random().toString(36).substr(2, 9);
+}
+
+// 处理流式响应
+async function handleStreamResponse(response) {
+    console.log('📥 开始读取流式响应...');
+    
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let currentEvent = null;
+    let currentAnswerId = null;
+    let isReceivingAnswer = false;
+    let messageCount = 0;
+
+    while (true) {
+        const { done, value } = await reader.read();
+        if (done) {
+            console.log('🏁 流式响应读取完成');
+            console.log(`📊 总共处理了 ${messageCount} 条消息`);
+            console.log(`📝 接收到的内容长度: ${typewriterContent ? typewriterContent.length : 0} 字符`);
+            break;
+        }
+
+        messageCount++;
+        if (messageCount % 10 === 0) {
+            console.log(`📈 已处理 ${messageCount} 条消息`);
+        }
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop(); // 保留最后一行，可能是不完整的
+
+        for (const line of lines) {
+            if (line.trim() === '') continue;
+            console.log('🔍 处理行:', line);
+            
+            try {
+                if (line.startsWith('event:')) {
+                    currentEvent = line.substring(6).trim();
+                    continue;
+                }
+                
+                if (line.startsWith('data:')) {
+                    const dataStr = line.substring(5).trim();
+                    if (dataStr === '[DONE]') {
+                        // 流结束，显示最终攻略
+                        if (typewriterContent) {
+                            await displayFinalGuide(typewriterContent);
+                        }
+                        return;
+                    }
+                    
+                    const data = JSON.parse(dataStr);
+                    
+                    // 根据事件类型处理
+                    switch (currentEvent) {
+                        case 'conversation.chat.created':
+                            if (CONFIG.DEBUG.enableLogging) {
+                                console.log('对话创建:', data);
+                            }
+                            break;
+                            
+                        case 'conversation.chat.in_progress':
+                            if (CONFIG.DEBUG.enableLogging) {
+                                console.log('对话处理中:', data);
+                            }
+                            break;
+                            
+                        case 'conversation.message.delta':
+                            // 增量消息，实时显示
+                            if (data.type === 'answer' && data.content) {
+                                if (!isReceivingAnswer) {
+                                    // 第一次收到delta，初始化
+                                    isReceivingAnswer = true;
+                                    currentAnswerId = data.id;
+                                    typewriterContent = '';
+                                    completeAllSteps();
+                                    showStep(3);
+                                    initTypewriterEffect();
+                                }
+                                
+                                if (data.id === currentAnswerId) {
+                                    handleAnswerDelta(data.content);
+                                }
+                            }
+                            break;
+                            
+                        case 'conversation.message.completed':
+                            // 完整消息
+                            await handleStreamEvent(data);
+                            break;
+                            
+                        case 'conversation.chat.completed':
+                            if (CONFIG.DEBUG.enableLogging) {
+                                console.log('对话完成:', data);
+                            }
+                            // 确保显示最终攻略
+                            if (typewriterContent && isReceivingAnswer) {
+                                await displayFinalGuide(typewriterContent);
+                            }
+                            break;
+                            
+                        case 'conversation.chat.failed':
+                            console.error('对话失败:', data);
+                            showError('AI服务响应失败，正在使用演示模式...');
+                            setTimeout(() => {
+                                fallbackToMockProcess();
+                            }, 2000);
+                            break;
+                            
+                        case 'done':
+                            // 流式响应结束
+                            if (typewriterContent) {
+                                await displayFinalGuide(typewriterContent);
+                            }
+                            return;
+                            
+                        default:
+                            console.log('未处理的事件:', currentEvent, data);
+                            break;
+                    }
+                }
+            } catch (error) {
+                console.error('解析流式数据失败:', error, line);
+            }
+        }
+    }
+}
+
+// 处理流式事件
+async function handleStreamEvent(data) {
+    const { type, content, role, id } = data;
+    
+    if (role === 'assistant') {
+        switch (type) {
+            case 'knowledge':
+                // 知识库召回 - 对应分析需求步骤
+                updateStepProgress('analyze', '知识库检索完成，正在分析您的需求...');
+                markStepCompleted(0); // 分析步骤完成
+                break;
+                
+            case 'function_call':
+                // 工具调用 - 根据工具类型更新不同步骤
+                handleFunctionCall(content);
+                break;
+                
+            case 'tool_output':
+                // 工具输出 - 更新对应步骤完成状态
+                handleToolOutput(content);
+                break;
+                
+            case 'answer':
+                // 最终回答处理
+                if (!isReceivingAnswer) {
+                    // 第一次收到answer，初始化
+                    isReceivingAnswer = true;
+                    currentAnswerId = id;
+                    typewriterContent = ''; // 重置内容
+                    // 完成所有步骤，准备显示攻略
+                    completeAllSteps();
+                    showStep(3);
+                    // 开始打字机效果
+                    initTypewriterEffect();
+                }
+                
+                // 如果是同一个回答的增量内容
+                if (id === currentAnswerId && content) {
+                    handleAnswerDelta(content);
+                }
+                break;
+                
+            case 'verbose':
+                // 处理verbose消息，可能包含状态信息
+                try {
+                    const verboseData = JSON.parse(content);
+                    if (verboseData.msg_type === 'generate_answer_finish') {
+                        // 回答生成完成
+                        isReceivingAnswer = false;
+                    }
+                } catch (error) {
+                    console.log('解析verbose消息失败:', error);
+                }
+                break;
+        }
+    }
+}
+
+// 处理函数调用
+function handleFunctionCall(content) {
+    try {
+        const functionCall = JSON.parse(content);
+        const functionName = functionCall.name;
+        
+        // 根据函数名更新对应步骤
+        if (functionName.includes('transport') || functionName.includes('ticket')) {
+            updateStepProgress('transport', '正在查询交通信息...');
+        } else if (functionName.includes('weather')) {
+            updateStepProgress('weather', '正在获取天气数据...');
+        } else if (functionName.includes('search') || functionName.includes('xiaohongshu')) {
+            updateStepProgress('attractions', '正在搜索热门景点和美食...');
+        } else {
+            updateStepProgress('plan', '正在整合信息制定攻略...');
+        }
+    } catch (error) {
+        console.error('解析function_call失败:', error);
+    }
+}
+
+// 处理工具输出
+function handleToolOutput(content) {
+    // 工具执行完成，标记对应步骤完成
+    markStepCompleted(currentProcessStep);
+    currentProcessStep++;
+    
+    // 如果还有下一步，激活它
+    if (currentProcessStep < processSteps.length) {
+        const nextStepId = processSteps[currentProcessStep];
+        activateStep(nextStepId);
+    }
+}
+
+// 更新步骤进度
+function updateStepProgress(stepId, message) {
+    const stepElement = document.getElementById(`step-${stepId}`);
+    if (stepElement && !stepElement.classList.contains('completed')) {
+        stepElement.classList.add('active');
+        stepElement.querySelector('.step-content p').textContent = message;
+    }
+}
+
+// 激活步骤
+function activateStep(stepId) {
+    const stepElement = document.getElementById(`step-${stepId}`);
+    stepElement.classList.add('active');
+    stepElement.querySelector('.step-status').innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+}
+
+// 标记步骤完成
+function markStepCompleted(stepIndex) {
+    if (stepIndex < processSteps.length) {
+        const stepId = processSteps[stepIndex];
+        const stepElement = document.getElementById(`step-${stepId}`);
+        stepElement.classList.remove('active');
+        stepElement.classList.add('completed');
+        stepElement.querySelector('.step-status').innerHTML = '<i class="fas fa-check"></i>';
+        
+        // 更新完成消息
+        const completedMessages = {
+            analyze: `分析完成！识别到${formData.adults + formData.children}人从${formData.departure}前往${formData.destination}的${formData.days}天行程需求`,
+            transport: `交通方案查询完成！已找到最优出行方案`,
+            weather: `天气查询完成！${formData.destination}近期天气适宜出行`,
+            attractions: `景点搜索完成！已为您筛选最佳推荐`,
+            plan: `攻略制定完成！正在为您呈现详细内容`
+        };
+        
+        stepElement.querySelector('.step-content p').textContent = completedMessages[stepId];
+    }
+}
+
+// 完成所有步骤
+function completeAllSteps() {
+    processSteps.forEach((stepId, index) => {
+        markStepCompleted(index);
+    });
+}
+
+// 显示错误信息
+function showError(message) {
+    const currentStepElement = document.getElementById(`step-${processSteps[currentProcessStep]}`);
+    if (currentStepElement) {
+        currentStepElement.querySelector('.step-content p').textContent = message;
+        currentStepElement.querySelector('.step-status').innerHTML = '<i class="fas fa-exclamation-triangle"></i>';
+    }
+}
+
+// 回退到模拟模式
+function fallbackToMockProcess() {
+    console.log('🎭 启动模拟处理模式');
+    currentProcessStep = 0; // 重置步骤计数器
     processNextStep();
 }
 
-// 处理下一步
+// 处理下一步（模拟模式）
 function processNextStep() {
     if (currentProcessStep < processSteps.length) {
         const stepId = processSteps[currentProcessStep];
         const stepElement = document.getElementById(`step-${stepId}`);
+        
+        console.log(`🔄 处理步骤 ${currentProcessStep + 1}: ${stepId}`);
         
         // 设置当前步骤为活跃状态
         stepElement.classList.add('active');
@@ -139,7 +573,7 @@ function processNextStep() {
             
             currentProcessStep++;
             processNextStep();
-        }, 2000 + Math.random() * 1000); // 随机延迟2-3秒
+        }, CONFIG.APP.mockStepDelay + Math.random() * 1000); // 使用配置的延迟时间
     } else {
         // 所有步骤完成，生成攻略
         setTimeout(() => {
@@ -180,9 +614,148 @@ function resetProcess() {
         stepElement.querySelector('.step-status').innerHTML = '<i class="fas fa-clock"></i>';
     });
     currentProcessStep = 0;
+    
+    // 重置AI处理相关变量
+    isReceivingAnswer = false;
+    currentAnswerId = null;
+    typewriterContent = '';
+    typewriterIndex = 0;
+    isTypewriterActive = false;
 }
 
-// 生成旅行攻略
+// 全局变量：打字机效果相关
+let typewriterContent = '';
+let typewriterIndex = 0;
+let typewriterSpeed = CONFIG?.APP?.typewriterSpeed || 30; // 打字速度（毫秒）
+let isTypewriterActive = false;
+
+// 初始化打字机效果
+function initTypewriterEffect() {
+    const guideContainer = document.getElementById('travel-guide');
+    guideContainer.innerHTML = `
+        <div class="typewriter-container">
+            <div class="typewriter-header">
+                <h2><i class="fas fa-magic"></i> AI正在为您生成个性化旅行攻略...</h2>
+                <div class="typing-indicator">
+                    <span class="dot"></span>
+                    <span class="dot"></span>
+                    <span class="dot"></span>
+                </div>
+            </div>
+            <div id="typewriter-content" class="typewriter-content"></div>
+            <div class="typewriter-cursor">|</div>
+        </div>
+    `;
+    
+    isTypewriterActive = true;
+}
+
+// 处理流式回答增量
+function handleAnswerDelta(content) {
+    if (!isTypewriterActive) return;
+    
+    typewriterContent += content;
+    // 实时显示增量内容
+    displayTypewriterContent();
+}
+
+// 显示打字机内容
+function displayTypewriterContent() {
+    const contentDiv = document.getElementById('typewriter-content');
+    if (!contentDiv || !isTypewriterActive) return;
+    
+    // 渲染markdown内容
+    const renderedContent = renderMarkdown(typewriterContent);
+    contentDiv.innerHTML = renderedContent;
+    
+    // 滚动到底部
+    contentDiv.scrollTop = contentDiv.scrollHeight;
+}
+
+// 简单的markdown渲染器
+function renderMarkdown(text) {
+    // 处理标题
+    text = text.replace(/^### (.*$)/gm, '<h3>$1</h3>');
+    text = text.replace(/^## (.*$)/gm, '<h2>$1</h2>');
+    text = text.replace(/^# (.*$)/gm, '<h1>$1</h1>');
+    
+    // 处理粗体
+    text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    
+    // 处理斜体
+    text = text.replace(/\*(.*?)\*/g, '<em>$1</em>');
+    
+    // 处理代码块
+    text = text.replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>');
+    
+    // 处理行内代码
+    text = text.replace(/`(.*?)`/g, '<code>$1</code>');
+    
+    // 处理链接
+    text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>');
+    
+    // 处理列表
+    text = text.replace(/^[\s]*[-*+] (.+)/gm, '<li>$1</li>');
+    text = text.replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>');
+    
+    // 处理数字列表
+    text = text.replace(/^\d+\. (.+)/gm, '<li>$1</li>');
+    
+    // 处理表格（简单版本）
+    const tableRegex = /\|(.+)\|\n\|[-:\s|]+\|\n((?:\|.+\|\n?)+)/g;
+    text = text.replace(tableRegex, (match, header, rows) => {
+        const headerCells = header.split('|').map(cell => cell.trim()).filter(cell => cell);
+        const headerHTML = '<tr>' + headerCells.map(cell => `<th>${cell}</th>`).join('') + '</tr>';
+        
+        const rowsHTML = rows.trim().split('\n').map(row => {
+            const cells = row.split('|').map(cell => cell.trim()).filter(cell => cell);
+            return '<tr>' + cells.map(cell => `<td>${cell}</td>`).join('') + '</tr>';
+        }).join('');
+        
+        return `<table class="markdown-table"><thead>${headerHTML}</thead><tbody>${rowsHTML}</tbody></table>`;
+    });
+    
+    // 处理换行
+    text = text.replace(/\n\n/g, '</p><p>');
+    text = text.replace(/\n/g, '<br>');
+    text = '<p>' + text + '</p>';
+    
+    // 清理空段落
+    text = text.replace(/<p><\/p>/g, '');
+    text = text.replace(/<p><br><\/p>/g, '');
+    
+    return text;
+}
+
+// 显示最终攻略
+async function displayFinalGuide(content) {
+    isTypewriterActive = false;
+    
+    const guideContainer = document.getElementById('travel-guide');
+    
+    // 显示完成状态
+    guideContainer.innerHTML = `
+        <div class="guide-complete">
+            <div class="success-header">
+                <i class="fas fa-check-circle"></i>
+                <h2>您的专属旅行攻略已生成完成！</h2>
+            </div>
+            <div class="final-content">
+                ${renderMarkdown(content)}
+            </div>
+        </div>
+    `;
+    
+    // 添加一些特效
+    setTimeout(() => {
+        const successHeader = guideContainer.querySelector('.success-header');
+        if (successHeader) {
+            successHeader.classList.add('animate-success');
+        }
+    }, 500);
+}
+
+// 生成旅行攻略（模拟模式回退）
 function generateTravelGuide() {
     const guideContainer = document.getElementById('travel-guide');
     const totalPeople = formData.adults + formData.children;
@@ -431,7 +1004,17 @@ function formatDate(dateString) {
 
 // 下载攻略
 function downloadGuide() {
-    const guideContent = document.getElementById('travel-guide').innerHTML;
+    let guideContent = '';
+    
+    // 检查是否是AI生成的内容
+    const finalContent = document.querySelector('.final-content');
+    if (finalContent) {
+        guideContent = finalContent.innerHTML;
+    } else {
+        // 回退到原始内容
+        guideContent = document.getElementById('travel-guide').innerHTML;
+    }
+    
     const htmlContent = `
         <!DOCTYPE html>
         <html lang="zh-CN">
@@ -440,22 +1023,143 @@ function downloadGuide() {
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <title>${formData.destination}旅行攻略</title>
             <style>
-                body { font-family: 'Microsoft YaHei', Arial, sans-serif; line-height: 1.6; margin: 40px; }
-                h1 { color: #2d3748; text-align: center; background: #f0f4f8; padding: 20px; border-radius: 10px; }
-                h2 { color: #4a5568; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; }
-                h3 { color: #2d3748; margin-top: 25px; }
-                table { width: 100%; border-collapse: collapse; margin: 20px 0; }
-                th, td { border: 1px solid #e2e8f0; padding: 10px; text-align: left; }
-                th { background: #f0f4f8; font-weight: bold; }
-                .highlight { background: #f0f4f8; padding: 15px; margin: 15px 0; border-radius: 5px; }
-                .warning { background: #fff5f5; border: 1px solid #fed7d7; padding: 15px; margin: 15px 0; border-radius: 5px; }
-                .budget-total { background: #f0fff4; font-weight: bold; }
-                a { color: #667eea; text-decoration: none; }
-                a:hover { text-decoration: underline; }
+                body { 
+                    font-family: 'Microsoft YaHei', Arial, sans-serif; 
+                    line-height: 1.6; 
+                    margin: 40px; 
+                    color: #333;
+                }
+                h1 { 
+                    color: #2d3748; 
+                    font-size: 1.8rem;
+                    margin: 20px 0 15px 0;
+                    padding: 20px;
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    color: white;
+                    border-radius: 10px;
+                    text-align: center;
+                }
+                h2 { 
+                    color: #4a5568; 
+                    font-size: 1.4rem;
+                    margin: 25px 0 10px 0;
+                    padding: 10px 0 10px 15px;
+                    border-left: 4px solid #667eea;
+                    background: #f8fafc;
+                }
+                h3 { 
+                    color: #2d3748; 
+                    font-size: 1.2rem;
+                    margin: 20px 0 8px 0;
+                }
+                .markdown-table { 
+                    width: 100%; 
+                    border-collapse: collapse; 
+                    margin: 20px 0;
+                    border-radius: 8px;
+                    overflow: hidden;
+                    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+                }
+                .markdown-table th { 
+                    background: #667eea;
+                    color: white;
+                    padding: 12px;
+                    text-align: left;
+                    font-weight: 600;
+                }
+                .markdown-table td { 
+                    padding: 10px 12px;
+                    border-bottom: 1px solid #e2e8f0;
+                }
+                .markdown-table tr:nth-child(even) td { 
+                    background: #f8fafc;
+                }
+                table { 
+                    width: 100%; 
+                    border-collapse: collapse; 
+                    margin: 20px 0; 
+                }
+                th, td { 
+                    border: 1px solid #e2e8f0; 
+                    padding: 10px; 
+                    text-align: left; 
+                }
+                th { 
+                    background: #667eea; 
+                    color: white;
+                    font-weight: bold; 
+                }
+                ul {
+                    margin: 10px 0;
+                    padding-left: 20px;
+                }
+                li {
+                    margin-bottom: 5px;
+                    color: #4a5568;
+                }
+                strong {
+                    color: #2d3748;
+                    font-weight: 600;
+                }
+                em {
+                    color: #667eea;
+                    font-style: italic;
+                }
+                code {
+                    background: #f1f5f9;
+                    padding: 2px 6px;
+                    border-radius: 4px;
+                    font-family: 'Courier New', monospace;
+                    font-size: 0.9em;
+                    color: #e53e3e;
+                }
+                pre {
+                    background: #1a202c;
+                    color: #f7fafc;
+                    padding: 15px;
+                    border-radius: 8px;
+                    overflow-x: auto;
+                    margin: 15px 0;
+                }
+                .highlight { 
+                    background: #ebf8ff; 
+                    padding: 15px; 
+                    margin: 15px 0; 
+                    border-radius: 8px;
+                    border-left: 4px solid #667eea;
+                }
+                .warning { 
+                    background: #fff5f5; 
+                    border: 1px solid #fed7d7; 
+                    padding: 15px; 
+                    margin: 15px 0; 
+                    border-radius: 8px; 
+                }
+                .budget-total { 
+                    background: #f0fff4; 
+                    font-weight: bold; 
+                }
+                a { 
+                    color: #667eea; 
+                    text-decoration: none; 
+                }
+                a:hover { 
+                    text-decoration: underline; 
+                }
+                @media print {
+                    body { margin: 20px; }
+                    h1 { break-after: avoid; }
+                    h2, h3 { break-after: avoid; }
+                }
             </style>
         </head>
         <body>
-            ${guideContent}
+            <div class="travel-guide-content">
+                ${guideContent}
+            </div>
+            <footer style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #e2e8f0; text-align: center; color: #718096;">
+                <p>本攻略由AI旅行规划助手生成 | 生成时间: ${new Date().toLocaleString('zh-CN')}</p>
+            </footer>
         </body>
         </html>
     `;
@@ -464,7 +1168,7 @@ function downloadGuide() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${formData.destination}旅行攻略.html`;
+    a.download = `${formData.destination}旅行攻略_${new Date().toISOString().slice(0, 10)}.html`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
