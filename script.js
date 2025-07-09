@@ -1,7 +1,7 @@
 // 全局变量
 let currentStep = 1;
 let formData = {};
-let processSteps = ['analyze', 'transport', 'weather', 'attractions', 'plan'];
+let processSteps = ['analyze', 'transport', 'weather', 'attractions', 'filter', 'read', 'plan'];
 let currentProcessStep = 0;
 
 // AI处理相关变量
@@ -136,7 +136,9 @@ function resetAllSteps() {
             analyze: '正在分析您的出行偏好和需求...',
             transport: '正在查询最优交通方案...',
             weather: '正在获取目的地天气预报...',
-            attractions: '正在小红书搜索推荐景点和美食...',
+            attractions: '正在全网搜索推荐景点和美食...',
+            filter: '正在筛选检索内容...',
+            read: '正在阅读检索内容...',
             plan: '正在为您制定个性化旅行攻略...'
         };
         stepElement.querySelector('.step-content p').textContent = messages[stepId];
@@ -280,6 +282,8 @@ async function handleStreamResponse(response) {
     let currentEvent = null;
     let currentAnswerId = null;
     let isReceivingAnswer = false;
+    let isReceivingToolResponse = false;
+    let isFinishedReceivingToolResponse = false;
     let messageCount = 0;
 
     while (true) {
@@ -339,7 +343,7 @@ async function handleStreamResponse(response) {
                         case 'conversation.message.delta':
                             // 增量消息，实时显示
                             if (data.type === 'answer' && data.content) {
-                                if (!isReceivingAnswer) {
+                                if (!isReceivingAnswer && isFinishedReceivingToolResponse) {
                                     // 第一次收到delta，初始化
                                     isReceivingAnswer = true;
                                     currentAnswerId = data.id;
@@ -356,6 +360,7 @@ async function handleStreamResponse(response) {
                             break;
                             
                         case 'conversation.message.completed':
+                            isFinishedReceivingToolResponse = true;
                             // 完整消息
                             await handleStreamEvent(data);
                             break;
@@ -519,7 +524,9 @@ function markStepCompleted(stepIndex) {
             analyze: `分析完成！识别到${formData.adults + formData.children}人从${formData.departure}前往${formData.destination}的${formData.days}天行程需求`,
             transport: `交通方案查询完成！已找到最优出行方案`,
             weather: `天气查询完成！${formData.destination}近期天气适宜出行`,
-            attractions: `景点搜索完成！已为您筛选最佳推荐`,
+            attractions: `景点搜索完成！即将为您筛选最佳推荐`,
+            filter: `检索内容筛选完成！筛选得到3条最相关内容`,
+            read: `检索内容阅读完成！即将为您制定对应攻略`,
             plan: `攻略制定完成！正在为您呈现详细内容`
         };
         
@@ -674,64 +681,103 @@ function displayTypewriterContent() {
 
 // 简单的markdown渲染器
 function renderMarkdown(text) {
-    // 处理标题
-    text = text.replace(/^### (.*$)/gm, '<h3>$1</h3>');
-    text = text.replace(/^## (.*$)/gm, '<h2>$1</h2>');
-    text = text.replace(/^# (.*$)/gm, '<h1>$1</h1>');
+    if (!text) return '';
     
-    // 处理粗体
-    text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    console.log('🔄 开始渲染Markdown，原始内容长度:', text.length);
     
-    // 处理斜体
-    text = text.replace(/\*(.*?)\*/g, '<em>$1</em>');
-    
-    // 处理代码块
-    text = text.replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>');
-    
-    // 处理行内代码
-    text = text.replace(/`(.*?)`/g, '<code>$1</code>');
-    
-    // 处理链接
-    text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>');
-    
-    // 处理列表
-    text = text.replace(/^[\s]*[-*+] (.+)/gm, '<li>$1</li>');
-    text = text.replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>');
-    
-    // 处理数字列表
-    text = text.replace(/^\d+\. (.+)/gm, '<li>$1</li>');
-    
-    // 处理表格（简单版本）
-    const tableRegex = /\|(.+)\|\n\|[-:\s|]+\|\n((?:\|.+\|\n?)+)/g;
-    text = text.replace(tableRegex, (match, header, rows) => {
-        const headerCells = header.split('|').map(cell => cell.trim()).filter(cell => cell);
-        const headerHTML = '<tr>' + headerCells.map(cell => `<th>${cell}</th>`).join('') + '</tr>';
+    try {
+        // 处理标题
+        text = text.replace(/^### (.*$)/gm, '<h3>$1</h3>');
+        text = text.replace(/^## (.*$)/gm, '<h2>$1</h2>');
+        text = text.replace(/^# (.*$)/gm, '<h1>$1</h1>');
         
-        const rowsHTML = rows.trim().split('\n').map(row => {
-            const cells = row.split('|').map(cell => cell.trim()).filter(cell => cell);
-            return '<tr>' + cells.map(cell => `<td>${cell}</td>`).join('') + '</tr>';
-        }).join('');
+        // 处理粗体
+        text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
         
-        return `<table class="markdown-table"><thead>${headerHTML}</thead><tbody>${rowsHTML}</tbody></table>`;
-    });
-    
-    // 处理换行
-    text = text.replace(/\n\n/g, '</p><p>');
-    text = text.replace(/\n/g, '<br>');
-    text = '<p>' + text + '</p>';
-    
-    // 清理空段落
-    text = text.replace(/<p><\/p>/g, '');
-    text = text.replace(/<p><br><\/p>/g, '');
-    
-    return text;
+        // 处理斜体
+        text = text.replace(/\*(.*?)\*/g, '<em>$1</em>');
+        
+        // 处理代码块
+        text = text.replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>');
+        
+        // 处理行内代码
+        text = text.replace(/`(.*?)`/g, '<code>$1</code>');
+        
+        // 处理链接
+        text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>');
+        
+        // 处理列表项
+        text = text.replace(/^[\s]*[-*+] (.+)/gm, '<li>$1</li>');
+        
+        // 处理数字列表
+        text = text.replace(/^\d+\. (.+)/gm, '<li>$1</li>');
+        
+        // 将连续的li标签包装到ul中
+        text = text.replace(/(<li>.*?<\/li>(\s*<li>.*?<\/li>)*)/g, '<ul>$1</ul>');
+        
+        // 处理表格（简单版本）
+        const tableRegex = /\|(.+)\|\n\|[-:\s|]+\|\n((?:\|.+\|\n?)+)/g;
+        text = text.replace(tableRegex, (match, header, rows) => {
+            try {
+                const headerCells = header.split('|').map(cell => cell.trim()).filter(cell => cell);
+                const headerHTML = '<tr>' + headerCells.map(cell => `<th>${cell}</th>`).join('') + '</tr>';
+                
+                const rowsHTML = rows.trim().split('\n').map(row => {
+                    const cells = row.split('|').map(cell => cell.trim()).filter(cell => cell);
+                    return '<tr>' + cells.map(cell => `<td>${cell}</td>`).join('') + '</tr>';
+                }).join('');
+                
+                return `<table class="markdown-table"><thead>${headerHTML}</thead><tbody>${rowsHTML}</tbody></table>`;
+            } catch (error) {
+                console.error('表格渲染失败:', error);
+                return match; // 返回原始内容
+            }
+        });
+        
+        // 处理段落和换行
+        text = text.replace(/\n\n/g, '</p><p>');
+        text = text.replace(/\n/g, '<br>');
+        text = '<p>' + text + '</p>';
+        
+        // 清理空段落
+        text = text.replace(/<p><\/p>/g, '');
+        text = text.replace(/<p><br><\/p>/g, '');
+        text = text.replace(/<p>\s*<\/p>/g, '');
+        
+        console.log('✅ Markdown渲染完成，最终内容长度:', text.length);
+        return text;
+        
+    } catch (error) {
+        console.error('❌ Markdown渲染过程中出错:', error);
+        // 返回简单的HTML转义版本
+        return text.replace(/\n/g, '<br>').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
 }
 
 // 显示最终攻略
 async function displayFinalGuide(content) {
+    console.log('🎯 displayFinalGuide 被调用，content长度:', content ? content.length : 0);
+    
     isTypewriterActive = false;
     
     const guideContainer = document.getElementById('travel-guide');
+    
+    // 验证内容
+    if (!content || content.trim() === '') {
+        console.warn('⚠️ 内容为空，显示默认消息');
+        content = '很抱歉，无法生成攻略内容。请重新尝试。';
+    }
+    
+    // 安全地渲染内容
+    let renderedContent = '';
+    try {
+        renderedContent = renderMarkdown(content);
+        console.log('✅ Markdown渲染成功');
+    } catch (error) {
+        console.error('❌ Markdown渲染失败:', error);
+        // 如果渲染失败，使用原始内容
+        renderedContent = content.replace(/\n/g, '<br>');
+    }
     
     // 显示完成状态
     guideContainer.innerHTML = `
@@ -741,16 +787,24 @@ async function displayFinalGuide(content) {
                 <h2>您的专属旅行攻略已生成完成！</h2>
             </div>
             <div class="final-content">
-                ${renderMarkdown(content)}
+                ${renderedContent}
             </div>
         </div>
     `;
+    
+    console.log('📄 攻略内容已设置到DOM');
+    
+    // 确保DOM更新完成后再添加动画
+    await new Promise(resolve => setTimeout(resolve, 100));
     
     // 添加一些特效
     setTimeout(() => {
         const successHeader = guideContainer.querySelector('.success-header');
         if (successHeader) {
             successHeader.classList.add('animate-success');
+            console.log('✨ 动画效果已添加');
+        } else {
+            console.warn('⚠️ 未找到success-header元素');
         }
     }, 500);
 }

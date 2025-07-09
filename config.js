@@ -4,7 +4,7 @@ const CONFIG = {
     COZE_API: {
         endpoint: 'https://api.coze.cn/v3/chat',
         // 请将下面的token替换为您的实际token
-        token: 'cztei_q4iKcbGCGzClLanpCWh4hwq3MgItuqAF75W4h1oeIYeJ1zHkvqmhqEgGfalV8M32T',
+        token: 'pat_571L1wQKVmNnLSx7NbZnFyO85nAxxk96Zn7L6FJjE29iOHniswPqQHOjkktSJLoB',
         // 请将下面的bot_id替换为您的实际bot_id
         bot_id: '7522887275014357033'
     },
