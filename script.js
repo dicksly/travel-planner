@@ -1,7 +1,7 @@
 // 全局变量
 let currentStep = 1;
 let formData = {};
-let processSteps = ['analyze', 'transport', 'weather', 'attractions', 'filter', 'read', 'plan'];
+let processSteps = ['planning', 'analyze', 'transport', 'weather', 'attractions', 'filter', 'correlation', 'read', 'plan'];
 let currentProcessStep = 0;
 
 // AI处理相关变量
@@ -121,6 +121,11 @@ function startAIProcess() {
     currentProcessStep = 0;
     // 重置所有步骤状态
     resetAllSteps();
+    // 激活第一个步骤(planning)
+    if (processSteps.length > 0) {
+        const firstStepId = processSteps[0];
+        activateStep(firstStepId);
+    }
     // 调用真实大模型API
     callCozeAPI();
 }
@@ -133,11 +138,13 @@ function resetAllSteps() {
         stepElement.querySelector('.step-status').innerHTML = '<i class="fas fa-clock"></i>';
         // 重置步骤描述
         const messages = {
+            planning: '正在生成工具执行计划...',
             analyze: '正在分析您的出行偏好和需求...',
             transport: '正在查询最优交通方案...',
             weather: '正在获取目的地天气预报...',
             attractions: '正在全网搜索推荐景点和美食...',
             filter: '正在筛选检索内容...',
+            correlation: '正在分析检索内容相关性...',
             read: '正在阅读检索内容...',
             plan: '正在为您制定个性化旅行攻略...'
         };
@@ -338,6 +345,16 @@ async function handleStreamResponse(response) {
                             if (CONFIG.DEBUG.enableLogging) {
                                 console.log('对话处理中:', data);
                             }
+                            // 对话开始处理，完成第一个步骤(planning)
+                            if (currentProcessStep === 0) {
+                                markStepCompleted(0); // 完成planning步骤
+                                currentProcessStep++;
+                                // 激活下一步
+                                if (currentProcessStep < processSteps.length) {
+                                    const nextStepId = processSteps[currentProcessStep];
+                                    activateStep(nextStepId);
+                                }
+                            }
                             break;
                             
                         case 'conversation.message.delta':
@@ -411,7 +428,15 @@ async function handleStreamEvent(data) {
             case 'knowledge':
                 // 知识库召回 - 对应分析需求步骤
                 updateStepProgress('analyze', '知识库检索完成，正在分析您的需求...');
-                markStepCompleted(0); // 分析步骤完成
+                // 确保分析步骤完成后进入下一步
+                if (currentProcessStep === 1) {
+                    markStepCompleted(1); // 分析步骤完成
+                    currentProcessStep++;
+                    if (currentProcessStep < processSteps.length) {
+                        const nextStepId = processSteps[currentProcessStep];
+                        activateStep(nextStepId);
+                    }
+                }
                 break;
                 
             case 'function_call':
@@ -483,14 +508,16 @@ function handleFunctionCall(content) {
 
 // 处理工具输出
 function handleToolOutput(content) {
-    // 工具执行完成，标记对应步骤完成
-    markStepCompleted(currentProcessStep);
-    currentProcessStep++;
-    
-    // 如果还有下一步，激活它
+    // 工具执行完成，根据当前步骤推进
     if (currentProcessStep < processSteps.length) {
-        const nextStepId = processSteps[currentProcessStep];
-        activateStep(nextStepId);
+        markStepCompleted(currentProcessStep);
+        currentProcessStep++;
+        
+        // 如果还有下一步，激活它
+        if (currentProcessStep < processSteps.length) {
+            const nextStepId = processSteps[currentProcessStep];
+            activateStep(nextStepId);
+        }
     }
 }
 
@@ -521,11 +548,13 @@ function markStepCompleted(stepIndex) {
         
         // 更新完成消息
         const completedMessages = {
+            planning: `相应工具执行计划生成完成！即将为您调用对应工具为您定制行程`,
             analyze: `分析完成！识别到${formData.adults + formData.children}人从${formData.departure}前往${formData.destination}的${formData.days}天行程需求`,
             transport: `交通方案查询完成！已找到最优出行方案`,
             weather: `天气查询完成！${formData.destination}近期天气适宜出行`,
             attractions: `景点搜索完成！即将为您筛选最佳推荐`,
             filter: `检索内容筛选完成！筛选得到3条最相关内容`,
+            correlation: `检索内容相关性分析完成！即将阅读理解相关内容`,
             read: `检索内容阅读完成！即将为您制定对应攻略`,
             plan: `攻略制定完成！正在为您呈现详细内容`
         };
@@ -554,6 +583,11 @@ function showError(message) {
 function fallbackToMockProcess() {
     console.log('🎭 启动模拟处理模式');
     currentProcessStep = 0; // 重置步骤计数器
+    // 确保第一个步骤(planning)被激活
+    if (processSteps.length > 0) {
+        const firstStepId = processSteps[0];
+        activateStep(firstStepId);
+    }
     processNextStep();
 }
 
@@ -596,10 +630,14 @@ function updateStepContent(stepId) {
     const contentElement = stepElement.querySelector('.step-content p');
     
     const messages = {
+        planning: `工具执行计划生成完成！即将为您调用对应工具为您定制行程`,
         analyze: `分析完成！识别到${formData.adults + formData.children}人从${formData.departure}前往${formData.destination}的${formData.days}天行程需求`,
         transport: `已找到最佳交通方案！推荐高铁出行，预计交通费用约${calculateTransportCost()}元`,
         weather: `天气查询完成！${formData.destination}近期天气良好，适合出行`,
         attractions: `发现${formData.destination}热门景点15个，特色美食8种，已筛选最适合您的推荐`,
+        filter: `检索内容筛选完成！筛选得到3条最相关内容`,
+        correlation: `检索内容相关性分析完成！即将阅读理解相关内容`,
+        read: `检索内容阅读完成！即将为您制定对应攻略`,
         plan: `个性化攻略制定完成！已为您规划详细的${formData.days}天行程安排`
     };
     
