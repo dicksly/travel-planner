@@ -787,6 +787,7 @@ body {
 }
 
 .success-header.animate-success {
+    opacity: 1;
     animation: successPulse 0.6s ease-out;
 }
 
